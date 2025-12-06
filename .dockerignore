@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+
+# VCS/IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+
+# Airflow runtime artifacts (if present locally)
+logs/
+airflow.db
+airflow.cfg
+unittests.cfg
+
+# Docker
+Dockerfile*
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

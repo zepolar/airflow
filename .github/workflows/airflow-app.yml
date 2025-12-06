@@ -1,0 +1,72 @@
+name: Build and Push to Azure Container Registry
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  # Allow manual runs from the Actions tab
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: airflow
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: 'pip'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - name: Run tests (if any)
+        run: |
+          set +e
+          pytest -q
+          code=$?
+          # pytest returns 5 when no tests are collected
+          if [ $code -eq 5 ]; then
+            echo "No tests collected, skipping."
+            exit 0
+          fi
+          exit $code
+
+  docker:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to ACR
+        uses: azure/docker-login@v2
+        with:
+          login-server: ${{ secrets.AZURE_CONTAINER_URI }}
+          username: ${{ secrets.AZURE_CONTAINER_USER }}
+          password: ${{ secrets.AZURE_CONTAINER_SECRET }}
+
+      - name: Build and Publish Docker
+        run: |
+          docker build -f Dockerfile -t ${{ secrets.AZURE_CONTAINER_URI }}/${{ env.IMAGE_NAME }}:${{env.IMAGE_TAG}} .
+          docker push ${{ secrets.AZURE_CONTAINER_URI }}/${{ env.IMAGE_NAME }}:${{env.IMAGE_TAG}}

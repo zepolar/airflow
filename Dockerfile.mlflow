@@ -1,0 +1,10 @@
+# syntax=docker/dockerfile:1
+
+# Extend the upstream MLflow image to add the Postgres driver
+FROM ghcr.io/mlflow/mlflow:latest
+
+# Install psycopg2 driver required for Postgres backend store
+# Use psycopg2-binary to avoid building from source
+RUN pip install --no-cache-dir "psycopg2-binary>=2.9,<3.0"
+
+# Default command remains provided by docker-compose
