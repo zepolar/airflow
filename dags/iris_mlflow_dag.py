@@ -20,14 +20,13 @@ from iris_pipeline.mlflow_utils import build_metrics_logger
 
 
 @dag(
-    schedule="*/10 * * * *",  # every 10 minutes
+    schedule="@daily",  # every day
     start_date=datetime(2025, 1, 1),
     catchup=False,
     tags=["example", "ml", "iris", "mlflow"],
     default_args={"owner": "airflow", "retries": 1},
 )
 def iris_mlflow_training_dag():
-    """Pipeline (runs every 10 minutes) using SOLID modules and TaskGroups."""
 
     settings = load_settings_from_env()
 
