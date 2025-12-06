@@ -7,9 +7,9 @@ def _get_settings(model_type: str):
 
     return Settings(
         postgres_conn_id="postgres_default",
-        iris_table="iris_data",
-        eval_table="iris_evaluation",
-        experiment_name="IrisClassifier",
+        breast_cancer_table="breast_cancer_data",
+        eval_table="breast_cancer_evaluation",
+        experiment_name="BreastCancerClassifier",
         model_type=model_type,
         test_size=0.2,
         random_state=42,
@@ -20,9 +20,9 @@ def _get_settings(model_type: str):
 def test_fit_model_logreg_returns_expected_keys():
     from dags.iris_pipeline.train import fit_model
 
-    iris = datasets.load_iris()
-    X = iris.data
-    y = iris.target
+    bc = datasets.load_breast_cancer()
+    X = bc.data
+    y = bc.target
     settings = _get_settings("logreg")
     result = fit_model(settings, X, y)
 
@@ -34,9 +34,9 @@ def test_fit_model_logreg_returns_expected_keys():
 def test_fit_model_rf_returns_expected_keys():
     from dags.iris_pipeline.train import fit_model
 
-    iris = datasets.load_iris()
-    X = iris.data
-    y = iris.target
+    bc = datasets.load_breast_cancer()
+    X = bc.data
+    y = bc.target
     settings = _get_settings("rf")
     result = fit_model(settings, X, y)
 

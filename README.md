@@ -1,20 +1,25 @@
-Airflow DAG: Iris Ingestion, Training and MLflow Logging
+Airflow DAG: Breast Cancer Ingestion, Training and MLflow Logging
 
-This project contains an Airflow DAG that runs every 10 minutes to:
+This project contains an Airflow DAG that runs daily to:
 
-1. Ingest the Iris dataset from scikit-learn into PostgreSQL (`iris_data`).
-2. Train a classifier (LogisticRegression by default) and log params, metrics and artifacts to MLflow.
-3. Persist evaluation metrics into PostgreSQL (`iris_evaluation`) and MLflow.
+1. Ingest the Breast Cancer dataset from scikit-learn into PostgreSQL (`breast_cancer_data`).
+2. Train a binary classifier (LogisticRegression by default) and log params, metrics and artifacts to MLflow.
+3. Persist evaluation metrics into PostgreSQL (`breast_cancer_evaluation`) and MLflow.
+
+The Breast Cancer dataset is a binary classification problem with:
+- 30 numerical features describing cell nuclei characteristics
+- 2 target classes: malignant (0) and benign (1)
+- 569 samples total
 
 Project layout
 
 - `dags/iris_mlflow_dag.py` — main DAG orchestrator using TaskFlow API and TaskGroups (SOLID refactor).
-- `dags/iris_pipeline/` — modular components (apply SOLID principles):
+- `dags/iris_pipeline/` — modular components (apply SOLID principles, directory name kept for backward compatibility):
   - `config.py` — settings read from environment variables at runtime.
   - `schemas.py` — DDL helpers for required tables.
   - `db.py` — DB engine and ensure‑tables helpers.
-  - `ingest.py` — load/transform the Iris dataset and write to DB.
-  - `train.py` — dataset loading from DB and model training (LogReg/RandomForest).
+  - `ingest.py` — load/transform the Breast Cancer dataset and write to DB.
+  - `train.py` — dataset loading from DB and model training (LogReg/RandomForest) with 30 features.
   - `metrics.py` — evaluation metrics and confusion matrix.
   - `mlflow_utils.py` — pluggable metrics logger (MLflow/NoOp).
   - `types.py` — small DTOs for XCom‑safe payloads.
@@ -44,7 +49,7 @@ You can run this DAG quickly using the included Dockerfile based on the official
 1) Build the image (from the project root):
 
 ```
-docker build -t iris-airflow:latest .
+docker build -t breast-cancer-airflow:latest .
 ```
 
 2) Run the container. Provide the Postgres connection and (optionally) MLflow tracking URI via environment variables. Airflow will start in standalone mode on port 8080.
@@ -59,15 +64,15 @@ docker run --rm -it -p 8080:8080 \
   -e MODEL_TYPE=logreg \
   -e TEST_SIZE=0.2 \
   -e RANDOM_STATE=42 \
-  -e EXPERIMENT_NAME=IrisClassifier \
-  -e IRIS_TABLE=iris_data \
-  -e EVAL_TABLE=iris_evaluation \
-  --name iris-airflow iris-airflow:latest
+  -e EXPERIMENT_NAME=BreastCancerClassifier \
+  -e BREAST_CANCER_TABLE=breast_cancer_data \
+  -e EVAL_TABLE=breast_cancer_evaluation \
+  --name breast-cancer-airflow breast-cancer-airflow:latest
 ```
 
 Notes:
 - Access the UI at http://localhost:8080. The image creates an admin user `admin`/`admin` on first start.
-- The DAG will appear as `iris_mlflow_training_dag`. Enable it and trigger a run.
+- The DAG will appear as `breast_cancer_mlflow_training_dag`. Enable it and trigger a run.
 - `AIRFLOW_CONN_POSTGRES_DEFAULT` sets the `postgres_default` connection used by the DAG.
 - If you prefer a persistent Airflow metadata DB (instead of SQLite), configure `AIRFLOW__DATABASE__SQL_ALCHEMY_CONN` accordingly and consider using Docker Compose with a Postgres service for Airflow metadata.
 
@@ -83,9 +88,9 @@ Airflow Connections and Variables
 
 Environment variables (read at runtime by `dags/iris_pipeline/config.py`):
 - `POSTGRES_CONN_ID` (default: `postgres_default`) — Airflow connection ID used by `PostgresHook`.
-- `IRIS_TABLE` (default: `iris_data`)
-- `EVAL_TABLE` (default: `iris_evaluation`)
-- `EXPERIMENT_NAME` (default: `IrisClassifier`)
+- `BREAST_CANCER_TABLE` (default: `breast_cancer_data`)
+- `EVAL_TABLE` (default: `breast_cancer_evaluation`)
+- `EXPERIMENT_NAME` (default: `BreastCancerClassifier`)
 - `MODEL_TYPE` (default: `logreg`, options: `logreg`, `rf`)
 - `TEST_SIZE` (default: `0.2`)
 - `RANDOM_STATE` (default: `42`)
@@ -94,24 +99,24 @@ Environment variables (read at runtime by `dags/iris_pipeline/config.py`):
 Tables
 
 The DAG creates tables if they don't exist:
-- `iris_data`
-- `iris_evaluation`
+- `breast_cancer_data` — stores the 30 features and target (0=malignant, 1=benign)
+- `breast_cancer_evaluation` — stores evaluation metrics
 
 DAG Details
 
-- DAG ID: inferred from file as `iris_mlflow_training_dag`
-- Schedule: `*/10 * * * *` (every 10 minutes)
+- DAG ID: inferred from file as `breast_cancer_mlflow_training_dag`
+- Schedule: `@daily` (runs daily)
 - TaskGroups and tasks:
   - `ingestion`:
-    - `create_iris_table` — ensure required tables exist (idempotent).
-    - `ingest_iris` — load Iris, transform, write to `iris_data`.
+    - `create_breast_cancer_table` — ensure required tables exist (idempotent).
+    - `ingest_breast_cancer` — load Breast Cancer dataset, transform, write to `breast_cancer_data`.
   - `training`:
-    - `load_data` — read `iris_data` from Postgres.
-    - `fit` — train selected model and serialize it to disk (path passed via XCom).
+    - `load_data` — read `breast_cancer_data` from Postgres.
+    - `fit` — train selected model on 30 features and serialize it to disk (path passed via XCom).
   - `evaluation`:
     - `compute` — compute accuracy, precision (weighted), recall (weighted) and save confusion matrix to CSV.
     - `log_mlflow` — optional MLflow logging (NoOp if no tracking URI).
-    - `persist` — write metrics into `iris_evaluation` with `execution_date`.
+    - `persist` — write metrics into `breast_cancer_evaluation` with `execution_date`.
 
 Model selection (parameter `model_type`):
 - `logreg` (default): `LogisticRegression(max_iter=400)`
@@ -123,14 +128,14 @@ Running the DAG
 2. Ensure the `postgres_default` connection is configured.
 3. (Optional) Set `MLFLOW_TRACKING_URI`.
 4. Start Airflow webserver and scheduler.
-5. In the Airflow UI, enable and trigger the DAG `iris_mlflow_training_dag`.
+5. In the Airflow UI, enable and trigger the DAG `breast_cancer_mlflow_training_dag`.
 
 Outputs
 
 - PostgreSQL tables populated:
-  - `iris_data` — raw features + labels + `ingestion_date`.
-  - `iris_evaluation` — `run_id` (if MLflow run succeeded), `accuracy`, `precision_weighted`, `recall_weighted`, `execution_date`.
-- MLflow experiment `IrisClassifier` with:
+  - `breast_cancer_data` — 30 features + target + `ingestion_date`.
+  - `breast_cancer_evaluation` — `run_id` (if MLflow run succeeded), `accuracy`, `precision_weighted`, `recall_weighted`, `execution_date`.
+- MLflow experiment `BreastCancerClassifier` with:
   - Parameters: model type, hyperparameters.
   - Metrics: accuracy, precision (weighted), recall (weighted).
   - Artifacts: serialized model, confusion matrix CSV, `features.txt`.
@@ -157,10 +162,10 @@ Troubleshooting
 
 MLflow experiment visibility
 
-- This pipeline logs to the experiment name defined by `EXPERIMENT_NAME` (default: `IrisClassifier`).
+- This pipeline logs to the experiment name defined by `EXPERIMENT_NAME` (default: `BreastCancerClassifier`).
 - Ensure the Airflow container has `MLFLOW_TRACKING_URI` set to the MLflow server URL (in docker-compose it is `http://mlflow:5000`).
 - If you only see the `Default` experiment in the MLflow UI:
-  - Confirm the Airflow logs of the `evaluation.log_mlflow` task show a line like: `MLflow logging: tracking_uri=http://mlflow:5000, experiment=IrisClassifier`.
+  - Confirm the Airflow logs of the `evaluation.log_mlflow` task show a line like: `MLflow logging: tracking_uri=http://mlflow:5000, experiment=BreastCancerClassifier`.
   - Make sure you are looking at the same MLflow server configured in `MLFLOW_TRACKING_URI`.
   - Trigger a DAG run and refresh the MLflow UI; the experiment will be created automatically if it doesn't exist.
 

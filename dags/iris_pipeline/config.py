@@ -10,11 +10,11 @@ class Settings:
     postgres_conn_id: str = "postgres_default"
 
     # Tables
-    iris_table: str = "iris_data"
-    eval_table: str = "iris_evaluation"
+    breast_cancer_table: str = "breast_cancer_data"
+    eval_table: str = "breast_cancer_evaluation"
 
     # ML/experiment
-    experiment_name: str = "IrisClassifier"
+    experiment_name: str = "BreastCancerClassifier"
     model_type: str = "logreg"  # or "rf"
     test_size: float = 0.2
     random_state: int = 42
@@ -31,9 +31,9 @@ def _get_env(name: str, default: str | None = None) -> str | None:
 def load_settings_from_env() -> Settings:
     return Settings(
         postgres_conn_id=_get_env("POSTGRES_CONN_ID", "postgres_default"),
-        iris_table=_get_env("IRIS_TABLE", "iris_data"),
-        eval_table=_get_env("EVAL_TABLE", "iris_evaluation"),
-        experiment_name=_get_env("EXPERIMENT_NAME", "IrisClassifier"),
+        breast_cancer_table=_get_env("BREAST_CANCER_TABLE", "breast_cancer_data"),
+        eval_table=_get_env("EVAL_TABLE", "breast_cancer_evaluation"),
+        experiment_name=_get_env("EXPERIMENT_NAME", "BreastCancerClassifier"),
         model_type=_get_env("MODEL_TYPE", "logreg"),
         test_size=float(_get_env("TEST_SIZE", "0.2")),
         random_state=int(_get_env("RANDOM_STATE", "42")),
