@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import logging
 import tempfile
 from datetime import datetime
 from typing import Dict, Any
@@ -95,6 +96,13 @@ def iris_mlflow_training_dag():
 
         @task()
         def log_mlflow(train_result: Dict[str, Any], eval_result: Dict[str, Any]) -> Dict[str, Any]:
+            # Emit a preflight log so users know where to look (Airflow task logs, not MLflow container)
+            effective_tracking_uri = settings.mlflow_tracking_uri or os.getenv("MLFLOW_TRACKING_URI")
+            logging.getLogger(__name__).info(
+                "About to log to MLflow from Airflow task: tracking_uri=%s, experiment=%s",
+                effective_tracking_uri,
+                settings.experiment_name,
+            )
             logger = build_metrics_logger(settings)
             ml = logger.log_all(
                 params=train_result["params"],

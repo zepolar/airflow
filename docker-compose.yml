@@ -40,7 +40,9 @@ services:
       # This fixes: "Rejected request with invalid Host header: mlflow:5000"
       # List comma-separated hostnames that will appear in the HTTP Host header
       # when clients (e.g., Airflow) call the MLflow server.
-      MLFLOW_TRACKING_SERVER_ALLOWED_HOSTS: mlflow,localhost,127.0.0.1
+      # Include both bare hostnames and host:port variants, as newer MLflow versions
+      # validate the full Host header which often includes the port (e.g., mlflow:5000).
+      MLFLOW_TRACKING_SERVER_ALLOWED_HOSTS: mlflow,localhost,127.0.0.1,mlflow:5000,localhost:5000,127.0.0.1:5000
 
   airflow:
     build:

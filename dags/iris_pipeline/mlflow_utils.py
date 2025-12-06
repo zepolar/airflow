@@ -48,6 +48,7 @@ class MLflowMetricsLogger(MetricsLogger):
         try:
             import mlflow
             import mlflow.sklearn  # ensure flavor registered
+            from mlflow.tracking import MlflowClient
 
             if self.tracking_uri:
                 mlflow.set_tracking_uri(self.tracking_uri)
@@ -57,10 +58,37 @@ class MLflowMetricsLogger(MetricsLogger):
                 mlflow.get_tracking_uri(),
                 self.experiment_name,
             )
-            logging.getLogger(__name__).debug("MLflow Experiment name: %s", self.experiment_name)
-            mlflow.set_experiment(self.experiment_name)
+            logging.getLogger(__name__).info("Ensuring MLflow experiment exists: %s", self.experiment_name)
 
-            with mlflow.start_run() as run:
+            # Robustly ensure the experiment exists and obtain its ID
+            client = MlflowClient()
+            exp = client.get_experiment_by_name(self.experiment_name)
+            if exp is None:
+                try:
+                    exp_id = client.create_experiment(self.experiment_name)
+                    logging.getLogger(__name__).info(
+                        "Created MLflow experiment '%s' with id=%s",
+                        self.experiment_name,
+                        exp_id,
+                    )
+                except Exception as ce:
+                    # There can be a race if multiple tasks try to create simultaneously; re-fetch
+                    logging.getLogger(__name__).warning(
+                        "Creating MLflow experiment failed (%s). Will retry fetching it.", ce
+                    )
+                    exp = client.get_experiment_by_name(self.experiment_name)
+                    if exp is None:
+                        raise
+                    exp_id = exp.experiment_id
+            else:
+                exp_id = exp.experiment_id
+
+            logging.getLogger(__name__).info(
+                "Using MLflow experiment '%s' (id=%s)", self.experiment_name, exp_id
+            )
+
+            # Start the run explicitly under the resolved experiment id
+            with mlflow.start_run(experiment_id=exp_id) as run:
                 run_id = run.info.run_id
                 mlflow.log_params(params)
                 mlflow.log_metrics(metrics)

@@ -147,6 +147,14 @@ Troubleshooting
 - Permission/DDL issues — ensure the Postgres user has privileges to create tables and insert data.
 - MLflow not reachable — verify `MLFLOW_TRACKING_URI` is correct and network is open. The DAG will continue without MLflow if unreachable.
 
+- Where do MLflow log messages appear? The message
+  "MLflow logging: tracking_uri=..., experiment=..." is emitted by the Airflow
+  task `evaluation.log_mlflow`, so you will see it in the Airflow container task logs
+  (Airflow UI → DAG run → Task `evaluation.log_mlflow` → Log). It will not appear
+  in the MLflow container logs. Additionally, just before logging, the task prints a
+  preflight line: "About to log to MLflow from Airflow task: tracking_uri=..., experiment=..."
+  to make the integration point explicit.
+
 MLflow experiment visibility
 
 - This pipeline logs to the experiment name defined by `EXPERIMENT_NAME` (default: `IrisClassifier`).
@@ -158,9 +166,11 @@ MLflow experiment visibility
 
 MLflow Host header warning
 
-- If you see a warning like `Rejected request with invalid Host header: mlflow:5000` in the MLflow container logs, it means the server is enforcing allowed hosts.
-- This repo's docker-compose sets `MLFLOW_TRACKING_SERVER_ALLOWED_HOSTS=mlflow,localhost,127.0.0.1` on the MLflow service so requests from the Airflow container (using hostname `mlflow`) and local browser (`localhost`) are accepted.
-- If you access the MLflow UI via a different hostname, add it to the list (comma-separated) under the MLflow service's environment in `docker-compose.yml` and restart the service.
+- If you see a warning like `Rejected request with invalid Host header: mlflow:5000` in the MLflow container logs, or HTTP 403 from the MLflow API when Airflow calls it, the server is enforcing allowed hosts.
+- This repo's docker-compose sets `MLFLOW_TRACKING_SERVER_ALLOWED_HOSTS` to include both bare hostnames and host:port variants:
+  - `mlflow,localhost,127.0.0.1,mlflow:5000,localhost:5000,127.0.0.1:5000`
+  This covers calls originating within the Docker network (host `mlflow`) and from your browser on localhost, including the explicit port 5000 which some MLflow versions validate strictly.
+- If you access the MLflow UI via a different hostname or port, add it (and its host:port form) to the list under the MLflow service's environment in `docker-compose.yml` and restart the service.
 
 Security and rate‑limit warnings
 
