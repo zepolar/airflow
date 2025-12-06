@@ -8,13 +8,13 @@ This project contains an Airflow DAG that runs daily to:
 
 The Breast Cancer dataset is a binary classification problem with:
 - 30 numerical features describing cell nuclei characteristics
-- 2 target classes: malignant (1) and benign (0)
+- 2 target classes: malignant (0) and benign (1)
 - 569 samples total
 
 Project layout
 
 - `dags/iris_mlflow_dag.py` — main DAG orchestrator using TaskFlow API and TaskGroups (SOLID refactor).
-- `dags/iris_pipeline/` — modular components (apply SOLID principles):
+- `dags/iris_pipeline/` — modular components (apply SOLID principles, directory name kept for backward compatibility):
   - `config.py` — settings read from environment variables at runtime.
   - `schemas.py` — DDL helpers for required tables.
   - `db.py` — DB engine and ensure‑tables helpers.
