@@ -1,0 +1,7 @@
+# Code owners for this repository
+# To ensure that only the repository owner can approve PRs,
+# enable the "Require review from Code Owners" option in your
+# protected branch rules (Settings → Branches → Branch protection rules).
+
+# Make @zepolar the code owner for the entire repository
+* @zepolar
