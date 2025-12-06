@@ -10,20 +10,15 @@ from .db import get_engine
 from .schemas import create_iris_table_sql
 
 
-RENAME_MAP = {
-    "sepal length (cm)": "sepal_length",
-    "sepal width (cm)": "sepal_width",
-    "petal length (cm)": "petal_length",
-    "petal width (cm)": "petal_width",
-}
+# For Diabetes dataset we keep original feature names from scikit-learn
+DIABETES_FEATURES = ["age", "sex", "bmi", "bp", "s1", "s2", "s3", "s4", "s5", "s6"]
 
 
 def load_iris_df(ds: str | None = None) -> pd.DataFrame:
-    iris = datasets.load_iris()
-    df = pd.DataFrame(iris.data, columns=iris.feature_names)
-    df = df.rename(columns=RENAME_MAP)
-    df["target"] = iris.target
-    df["target_name"] = df["target"].apply(lambda i: iris.target_names[i])
+    # Backward-compatible function name; now loads Diabetes dataset
+    diabetes = datasets.load_diabetes()
+    df = pd.DataFrame(diabetes.data, columns=DIABETES_FEATURES)
+    df["target"] = diabetes.target
     if ds:
         df["ingestion_date"] = pd.to_datetime(ds).normalize()
     return df

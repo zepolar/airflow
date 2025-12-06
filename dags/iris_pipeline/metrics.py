@@ -3,14 +3,13 @@ from __future__ import annotations
 from typing import Tuple
 
 import numpy as np
-from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 from .types import EvalMetrics
 
 
-def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Tuple[EvalMetrics, np.ndarray]:
-    acc = float(accuracy_score(y_true, y_pred))
-    prec = float(precision_score(y_true, y_pred, average="weighted", zero_division=0))
-    rec = float(recall_score(y_true, y_pred, average="weighted", zero_division=0))
-    cm = confusion_matrix(y_true, y_pred)
-    return EvalMetrics(accuracy=acc, precision_weighted=prec, recall_weighted=rec), cm
+def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> EvalMetrics:
+    rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
+    mae = float(mean_absolute_error(y_true, y_pred))
+    r2 = float(r2_score(y_true, y_pred))
+    return EvalMetrics(rmse=rmse, mae=mae, r2=r2)

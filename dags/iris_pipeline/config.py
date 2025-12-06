@@ -10,12 +10,12 @@ class Settings:
     postgres_conn_id: str = "postgres_default"
 
     # Tables
-    iris_table: str = "iris_data"
-    eval_table: str = "iris_evaluation"
+    iris_table: str = "diabetes_data"
+    eval_table: str = "diabetes_evaluation"
 
     # ML/experiment
-    experiment_name: str = "IrisClassifier"
-    model_type: str = "logreg"  # or "rf"
+    experiment_name: str = "DiabetesRegressor"
+    model_type: str = "linreg"  # or "rf"
     test_size: float = 0.2
     random_state: int = 42
 
@@ -31,10 +31,10 @@ def _get_env(name: str, default: str | None = None) -> str | None:
 def load_settings_from_env() -> Settings:
     return Settings(
         postgres_conn_id=_get_env("POSTGRES_CONN_ID", "postgres_default"),
-        iris_table=_get_env("IRIS_TABLE", "iris_data"),
-        eval_table=_get_env("EVAL_TABLE", "iris_evaluation"),
-        experiment_name=_get_env("EXPERIMENT_NAME", "IrisClassifier"),
-        model_type=_get_env("MODEL_TYPE", "logreg"),
+        iris_table=_get_env("IRIS_TABLE", "diabetes_data"),
+        eval_table=_get_env("EVAL_TABLE", "diabetes_evaluation"),
+        experiment_name=_get_env("EXPERIMENT_NAME", "DiabetesRegressor"),
+        model_type=_get_env("MODEL_TYPE", "linreg"),
         test_size=float(_get_env("TEST_SIZE", "0.2")),
         random_state=int(_get_env("RANDOM_STATE", "42")),
         mlflow_tracking_uri=_get_env("MLFLOW_TRACKING_URI"),

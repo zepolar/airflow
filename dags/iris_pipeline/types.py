@@ -20,10 +20,9 @@ class TrainingResult:
 
 @dataclass(frozen=True)
 class EvalMetrics:
-    accuracy: float
-    precision_weighted: float
-    recall_weighted: float
-    confusion_matrix_path: Optional[str] = None
+    rmse: float
+    mae: float
+    r2: float
 
 
 @dataclass(frozen=True)

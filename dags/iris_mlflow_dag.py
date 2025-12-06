@@ -23,7 +23,7 @@ from iris_pipeline.mlflow_utils import build_metrics_logger
     schedule="@daily",  # every day
     start_date=datetime(2025, 1, 1),
     catchup=False,
-    tags=["example", "ml", "iris", "mlflow"],
+    tags=["example", "ml", "diabetes", "mlflow"],
     default_args={"owner": "airflow", "retries": 1},
 )
 def iris_mlflow_training_dag():
@@ -78,19 +78,13 @@ def iris_mlflow_training_dag():
         def compute(train_result: Dict[str, Any]) -> Dict[str, Any]:
             y_test = train_result["y_test"]
             y_pred = train_result["y_pred"]
-            eval_metrics, cm = metrics_mod.compute_metrics(y_test, y_pred)
-
-            # Persist confusion matrix to file for artifact logging
-            tmp_dir = tempfile.mkdtemp(prefix="iris_eval_")
-            cm_path = os.path.join(tmp_dir, "confusion_matrix.csv")
-            pd.DataFrame(cm).to_csv(cm_path, index=False)
+            eval_metrics = metrics_mod.compute_metrics(np.array(y_test), np.array(y_pred))
             return {
                 "metrics": {
-                    "accuracy": eval_metrics.accuracy,
-                    "precision_weighted": eval_metrics.precision_weighted,
-                    "recall_weighted": eval_metrics.recall_weighted,
-                },
-                "confusion_matrix_path": cm_path,
+                    "rmse": eval_metrics.rmse,
+                    "mae": eval_metrics.mae,
+                    "r2": eval_metrics.r2,
+                }
             }
 
         @task()
@@ -109,7 +103,7 @@ def iris_mlflow_training_dag():
                 metrics=eval_result["metrics"],
                 model_path=train_result["model_path"],
                 features=train_result["features"],
-                confusion_matrix_path=eval_result.get("confusion_matrix_path"),
+                confusion_matrix_path=None,
             )
             # Post-flight visibility to confirm MLflow outcome in Airflow task logs
             print(f"[MLFLOW] END logging: run_id={ml.run_id}, error={ml.error}", flush=True)
@@ -129,9 +123,9 @@ def iris_mlflow_training_dag():
             )
             payload = {
                 "run_id": mlflow_result.get("run_id"),
-                "accuracy": eval_result["metrics"]["accuracy"],
-                "precision_weighted": eval_result["metrics"]["precision_weighted"],
-                "recall_weighted": eval_result["metrics"]["recall_weighted"],
+                "rmse": eval_result["metrics"]["rmse"],
+                "mae": eval_result["metrics"]["mae"],
+                "r2": eval_result["metrics"]["r2"],
                 "execution_date": pd.to_datetime(ds).date(),
             }
             pd.DataFrame([payload]).to_sql(settings.eval_table, engine, if_exists="append", index=False)
