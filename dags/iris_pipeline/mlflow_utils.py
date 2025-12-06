@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Dict, Any, Optional
-
-import pandas as pd
 
 from .config import Settings
 from .types import MlflowResult
@@ -52,6 +51,13 @@ class MLflowMetricsLogger(MetricsLogger):
 
             if self.tracking_uri:
                 mlflow.set_tracking_uri(self.tracking_uri)
+            # Emit a small debug line to Airflow logs to make troubleshooting easier
+            logging.getLogger(__name__).info(
+                "MLflow logging: tracking_uri=%s, experiment=%s",
+                mlflow.get_tracking_uri(),
+                self.experiment_name,
+            )
+            logging.getLogger(__name__).debug("MLflow Experiment name: %s", self.experiment_name)
             mlflow.set_experiment(self.experiment_name)
 
             with mlflow.start_run() as run:
@@ -80,10 +86,13 @@ class MLflowMetricsLogger(MetricsLogger):
 
                 return MlflowResult(run_id=run_id, error=None)
         except Exception as e:
+            logging.getLogger(__name__).warning("MLflow logging failed: %s", e)
             return MlflowResult(run_id=None, error=str(e))
 
 
 def build_metrics_logger(settings: Settings) -> MetricsLogger:
-    if settings.mlflow_tracking_uri:
-        return MLflowMetricsLogger(settings.mlflow_tracking_uri, settings.experiment_name)
-    return NoOpMetricsLogger()
+    # Prefer explicit setting; if missing, fall back to environment.
+    tracking_uri = settings.mlflow_tracking_uri or os.getenv("MLFLOW_TRACKING_URI")
+    # Always return an MLflow logger so we surface errors instead of silently NoOp'ing.
+    # If tracking_uri is None, MLflow uses its default local store; this still helps with debugging.
+    return MLflowMetricsLogger(tracking_uri, settings.experiment_name)

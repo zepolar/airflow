@@ -36,6 +36,11 @@ services:
       - mlflow_artifacts:/mlflow/artifacts
     environment:
       MLFLOW_TRACKING_URI: http://0.0.0.0:5000
+      # Allow requests coming from Docker network hostnames to the tracking server
+      # This fixes: "Rejected request with invalid Host header: mlflow:5000"
+      # List comma-separated hostnames that will appear in the HTTP Host header
+      # when clients (e.g., Airflow) call the MLflow server.
+      MLFLOW_TRACKING_SERVER_ALLOWED_HOSTS: mlflow,localhost,127.0.0.1
 
   airflow:
     build:
@@ -62,6 +67,8 @@ services:
       AIRFLOW_CONN_POSTGRES_DEFAULT: postgresql://mlflow:mlflow@postgres:5432/mlflow
       # Point MLflow client in the DAGs to the MLflow tracking server service
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      # Explicit experiment name to appear in MLflow UI (created if not exists)
+      EXPERIMENT_NAME: IrisClassifier
       # Ensure examples are not loaded (redundant with Dockerfile but explicit here)
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       # Set a Fernet key to enable encryption of Airflow connections/variables (dev default; override in prod)

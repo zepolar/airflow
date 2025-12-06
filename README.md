@@ -147,6 +147,21 @@ Troubleshooting
 - Permission/DDL issues — ensure the Postgres user has privileges to create tables and insert data.
 - MLflow not reachable — verify `MLFLOW_TRACKING_URI` is correct and network is open. The DAG will continue without MLflow if unreachable.
 
+MLflow experiment visibility
+
+- This pipeline logs to the experiment name defined by `EXPERIMENT_NAME` (default: `IrisClassifier`).
+- Ensure the Airflow container has `MLFLOW_TRACKING_URI` set to the MLflow server URL (in docker-compose it is `http://mlflow:5000`).
+- If you only see the `Default` experiment in the MLflow UI:
+  - Confirm the Airflow logs of the `evaluation.log_mlflow` task show a line like: `MLflow logging: tracking_uri=http://mlflow:5000, experiment=IrisClassifier`.
+  - Make sure you are looking at the same MLflow server configured in `MLFLOW_TRACKING_URI`.
+  - Trigger a DAG run and refresh the MLflow UI; the experiment will be created automatically if it doesn't exist.
+
+MLflow Host header warning
+
+- If you see a warning like `Rejected request with invalid Host header: mlflow:5000` in the MLflow container logs, it means the server is enforcing allowed hosts.
+- This repo's docker-compose sets `MLFLOW_TRACKING_SERVER_ALLOWED_HOSTS=mlflow,localhost,127.0.0.1` on the MLflow service so requests from the Airflow container (using hostname `mlflow`) and local browser (`localhost`) are accepted.
+- If you access the MLflow UI via a different hostname, add it to the list (comma-separated) under the MLflow service's environment in `docker-compose.yml` and restart the service.
+
 Security and rate‑limit warnings
 
 - Airflow cryptography key: If you see "empty cryptography key - values will not be stored encrypted", set a Fernet key. This repo's docker-compose sets a dev key via `AIRFLOW__CORE__FERNET_KEY`. For production, override it with your own secure key: `openssl rand -base64 32` and place it in an environment variable or secret.
