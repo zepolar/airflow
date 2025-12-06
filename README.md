@@ -1,21 +1,21 @@
-Airflow DAG: Iris Ingestion, Training and MLflow Logging
+Airflow DAG: Diabetes Regression (scikit‑learn) with MLflow Logging
 
-This project contains an Airflow DAG that runs every 10 minutes to:
+This project contains an Airflow DAG that runs daily to:
 
-1. Ingest the Iris dataset from scikit-learn into PostgreSQL (`iris_data`).
-2. Train a classifier (LogisticRegression by default) and log params, metrics and artifacts to MLflow.
-3. Persist evaluation metrics into PostgreSQL (`iris_evaluation`) and MLflow.
+1. Ingest the scikit‑learn Diabetes dataset into PostgreSQL (`diabetes_data`).
+2. Entrenar un modelo de regresión (LinearRegression por defecto, o RandomForestRegressor con `MODEL_TYPE=rf`) y registrar parámetros, métricas y artefactos en MLflow.
+3. Persistir métricas de evaluación de regresión (`rmse`, `mae`, `r2`) en PostgreSQL (`diabetes_evaluation`) y en MLflow.
 
 Project layout
 
-- `dags/iris_mlflow_dag.py` — main DAG orchestrator using TaskFlow API and TaskGroups (SOLID refactor).
-- `dags/iris_pipeline/` — modular components (apply SOLID principles):
+- `dags/iris_mlflow_dag.py` — main DAG orchestrator using TaskFlow API and TaskGroups (SOLID refactor). Nota: el ID del DAG se mantiene como `iris_mlflow_training_dag` por compatibilidad, aunque ahora procesa Diabetes.
+- `dags/iris_pipeline/` — modular components (SOLID):
   - `config.py` — settings read from environment variables at runtime.
   - `schemas.py` — DDL helpers for required tables.
   - `db.py` — DB engine and ensure‑tables helpers.
-  - `ingest.py` — load/transform the Iris dataset and write to DB.
-  - `train.py` — dataset loading from DB and model training (LogReg/RandomForest).
-  - `metrics.py` — evaluation metrics and confusion matrix.
+  - `ingest.py` — carga y escribe el dataset Diabetes a la base.
+  - `train.py` — lectura desde la tabla de datos y entrenamiento (LinearRegression/RandomForestRegressor).
+  - `metrics.py` — cálculo de métricas de regresión: RMSE, MAE, R².
   - `mlflow_utils.py` — pluggable metrics logger (MLflow/NoOp).
   - `types.py` — small DTOs for XCom‑safe payloads.
 - `tests/` — unit tests for metrics, ingest, train, and logger utilities (pytest).
@@ -44,7 +44,7 @@ You can run this DAG quickly using the included Dockerfile based on the official
 1) Build the image (from the project root):
 
 ```
-docker build -t iris-airflow:latest .
+docker build -t diabetes-airflow:latest .
 ```
 
 2) Run the container. Provide the Postgres connection and (optionally) MLflow tracking URI via environment variables. Airflow will start in standalone mode on port 8080.
@@ -56,18 +56,18 @@ docker run --rm -it -p 8080:8080 \
   -e AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False \
   -e AIRFLOW_CONN_POSTGRES_DEFAULT=postgresql+psycopg2://USER:PASSWORD@HOST:5432/DBNAME \
   -e MLFLOW_TRACKING_URI=http://mlflow:5000 \
-  -e MODEL_TYPE=logreg \
+  -e MODEL_TYPE=linreg \
   -e TEST_SIZE=0.2 \
   -e RANDOM_STATE=42 \
-  -e EXPERIMENT_NAME=IrisClassifier \
-  -e IRIS_TABLE=iris_data \
-  -e EVAL_TABLE=iris_evaluation \
-  --name iris-airflow iris-airflow:latest
+  -e EXPERIMENT_NAME=DiabetesRegressor \
+  -e IRIS_TABLE=diabetes_data \
+  -e EVAL_TABLE=diabetes_evaluation \
+  --name diabetes-airflow diabetes-airflow:latest
 ```
 
 Notes:
 - Access the UI at http://localhost:8080. The image creates an admin user `admin`/`admin` on first start.
-- The DAG will appear as `iris_mlflow_training_dag`. Enable it and trigger a run.
+- The DAG will appear as `iris_mlflow_training_dag` (ID conservado). Enable it and trigger a run.
 - `AIRFLOW_CONN_POSTGRES_DEFAULT` sets the `postgres_default` connection used by the DAG.
 - If you prefer a persistent Airflow metadata DB (instead of SQLite), configure `AIRFLOW__DATABASE__SQL_ALCHEMY_CONN` accordingly and consider using Docker Compose with a Postgres service for Airflow metadata.
 
@@ -83,39 +83,39 @@ Airflow Connections and Variables
 
 Environment variables (read at runtime by `dags/iris_pipeline/config.py`):
 - `POSTGRES_CONN_ID` (default: `postgres_default`) — Airflow connection ID used by `PostgresHook`.
-- `IRIS_TABLE` (default: `iris_data`)
-- `EVAL_TABLE` (default: `iris_evaluation`)
-- `EXPERIMENT_NAME` (default: `IrisClassifier`)
-- `MODEL_TYPE` (default: `logreg`, options: `logreg`, `rf`)
-- `TEST_SIZE` (default: `0.2`)
-- `RANDOM_STATE` (default: `42`)
-- `MLFLOW_TRACKING_URI` (optional)
+- `IRIS_TABLE` (default: `diabetes_data`) — tabla de datos (nombre conservado por compatibilidad de código).
+- `EVAL_TABLE` (default: `diabetes_evaluation`).
+- `EXPERIMENT_NAME` (default: `DiabetesRegressor`).
+- `MODEL_TYPE` (default: `linreg`, options: `linreg`, `rf`).
+- `TEST_SIZE` (default: `0.2`).
+- `RANDOM_STATE` (default: `42`).
+- `MLFLOW_TRACKING_URI` (optional).
 
 Tables
 
 The DAG creates tables if they don't exist:
-- `iris_data`
-- `iris_evaluation`
+- `diabetes_data` (features: `age, sex, bmi, bp, s1..s6`, `target`, `ingestion_date`)
+- `diabetes_evaluation` (`run_id`, `rmse`, `mae`, `r2`, `execution_date`)
 
 DAG Details
 
-- DAG ID: inferred from file as `iris_mlflow_training_dag`
-- Schedule: `*/10 * * * *` (every 10 minutes)
+- DAG ID: `iris_mlflow_training_dag` (mantenido por compatibilidad)
+- Schedule: `@daily`
 - TaskGroups and tasks:
   - `ingestion`:
     - `create_iris_table` — ensure required tables exist (idempotent).
-    - `ingest_iris` — load Iris, transform, write to `iris_data`.
+    - `ingest_iris` — cargar Diabetes y escribir en `diabetes_data`.
   - `training`:
-    - `load_data` — read `iris_data` from Postgres.
-    - `fit` — train selected model and serialize it to disk (path passed via XCom).
+    - `load_data` — leer `diabetes_data` desde Postgres.
+    - `fit` — entrenar el modelo seleccionado y serializarlo en disco (ruta vía XCom).
   - `evaluation`:
-    - `compute` — compute accuracy, precision (weighted), recall (weighted) and save confusion matrix to CSV.
-    - `log_mlflow` — optional MLflow logging (NoOp if no tracking URI).
-    - `persist` — write metrics into `iris_evaluation` with `execution_date`.
+    - `compute` — calcular RMSE, MAE, R².
+    - `log_mlflow` — logging a MLflow (si está configurado; sino, continúa).
+    - `persist` — escribir métricas en `diabetes_evaluation` con `execution_date`.
 
-Model selection (parameter `model_type`):
-- `logreg` (default): `LogisticRegression(max_iter=400)`
-- `rf`: `RandomForestClassifier(random_state=42)`
+Model selection (parameter `MODEL_TYPE`):
+- `linreg` (default): `LinearRegression()`
+- `rf`: `RandomForestRegressor(random_state=RANDOM_STATE)`
 
 Running the DAG
 
@@ -128,12 +128,12 @@ Running the DAG
 Outputs
 
 - PostgreSQL tables populated:
-  - `iris_data` — raw features + labels + `ingestion_date`.
-  - `iris_evaluation` — `run_id` (if MLflow run succeeded), `accuracy`, `precision_weighted`, `recall_weighted`, `execution_date`.
-- MLflow experiment `IrisClassifier` with:
+  - `diabetes_data` — 10 features + `target` + `ingestion_date`.
+  - `diabetes_evaluation` — `run_id` (si MLflow fue exitoso), `rmse`, `mae`, `r2`, `execution_date`.
+- MLflow experiment `DiabetesRegressor` with:
   - Parameters: model type, hyperparameters.
-  - Metrics: accuracy, precision (weighted), recall (weighted).
-  - Artifacts: serialized model, confusion matrix CSV, `features.txt`.
+  - Metrics: RMSE, MAE, R².
+  - Artifacts: serialized model and `features.txt` (confusion matrix removed for regression).
 
 Configuration Notes
 
@@ -151,16 +151,15 @@ Troubleshooting
   "MLflow logging: tracking_uri=..., experiment=..." is emitted by the Airflow
   task `evaluation.log_mlflow`, so you will see it in the Airflow container task logs
   (Airflow UI → DAG run → Task `evaluation.log_mlflow` → Log). It will not appear
-  in the MLflow container logs. Additionally, just before logging, the task prints a
-  preflight line: "About to log to MLflow from Airflow task: tracking_uri=..., experiment=..."
-  to make the integration point explicit.
+  in the MLflow container logs. Additionally, the task prints pre/post flight lines to make
+  the integration point explicit.
 
 MLflow experiment visibility
 
-- This pipeline logs to the experiment name defined by `EXPERIMENT_NAME` (default: `IrisClassifier`).
+- This pipeline logs to the experiment name defined by `EXPERIMENT_NAME` (default: `DiabetesRegressor`).
 - Ensure the Airflow container has `MLFLOW_TRACKING_URI` set to the MLflow server URL (in docker-compose it is `http://mlflow:5000`).
 - If you only see the `Default` experiment in the MLflow UI:
-  - Confirm the Airflow logs of the `evaluation.log_mlflow` task show a line like: `MLflow logging: tracking_uri=http://mlflow:5000, experiment=IrisClassifier`.
+  - Confirm the Airflow logs of the `evaluation.log_mlflow` task show a line like: `MLflow logging: tracking_uri=http://mlflow:5000, experiment=DiabetesRegressor`.
   - Make sure you are looking at the same MLflow server configured in `MLFLOW_TRACKING_URI`.
   - Trigger a DAG run and refresh the MLflow UI; the experiment will be created automatically if it doesn't exist.
 
@@ -187,10 +186,10 @@ pytest -q
 ```
 
 The tests cover:
-- `metrics.py` — correctness of basic metric computations.
-- `ingest.py` — column renaming and `ingestion_date` normalization.
-- `train.py` — model selection/logreg vs rf and expected outputs.
-- `mlflow_utils.py` — NoOp logger behavior without a tracking server.
+- `metrics.py` — RMSE/MAE/R² correctness for regression.
+- `ingest.py` — estructura de columnas y normalización de `ingestion_date` para Diabetes.
+- `train.py` — selección de modelo (linreg vs rf) y salidas esperadas.
+- `mlflow_utils.py` — comportamiento del logger sin servidor de tracking.
 
 Docker tips
 
