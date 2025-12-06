@@ -19,5 +19,5 @@ def get_engine(settings: Settings) -> Engine:
 def ensure_tables(engine: Engine, settings: Settings) -> None:
     """Create required tables if they do not exist (idempotent)."""
     with engine.begin() as conn:
-        conn.execute(schemas.create_iris_table_sql(settings.iris_table))
+        conn.execute(schemas.create_breast_cancer_table_sql(settings.breast_cancer_table))
         conn.execute(schemas.create_eval_table_sql(settings.eval_table))

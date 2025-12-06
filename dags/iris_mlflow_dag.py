@@ -23,31 +23,31 @@ from iris_pipeline.mlflow_utils import build_metrics_logger
     schedule="@daily",  # every day
     start_date=datetime(2025, 1, 1),
     catchup=False,
-    tags=["example", "ml", "iris", "mlflow"],
+    tags=["example", "ml", "breast_cancer", "mlflow"],
     default_args={"owner": "airflow", "retries": 1},
 )
-def iris_mlflow_training_dag():
+def breast_cancer_mlflow_training_dag():
 
     settings = load_settings_from_env()
 
     @task_group(group_id="ingestion")
     def ingestion_group():
         @task()
-        def create_iris_table() -> str:
+        def create_breast_cancer_table() -> str:
             engine = db_mod.get_engine(settings)
             db_mod.ensure_tables(engine, settings)
-            return settings.iris_table
+            return settings.breast_cancer_table
 
         @task()
-        def ingest_iris() -> Dict[str, Any]:
+        def ingest_breast_cancer() -> Dict[str, Any]:
             ctx = get_current_context()
             ds = ctx.get("ds")
-            df = ingest_mod.load_iris_df(ds)
-            rows = ingest_mod.write_iris(settings, df)
-            return {"rows_ingested": rows, "table": settings.iris_table}
+            df = ingest_mod.load_breast_cancer_df(ds)
+            rows = ingest_mod.write_breast_cancer(settings, df)
+            return {"rows_ingested": rows, "table": settings.breast_cancer_table}
 
-        _ = create_iris_table()
-        return ingest_iris()
+        _ = create_breast_cancer_table()
+        return ingest_breast_cancer()
 
     @task_group(group_id="training")
     def training_group():
@@ -55,7 +55,7 @@ def iris_mlflow_training_dag():
         def load_data() -> Dict[str, Any]:
             X, y = train_mod.load_dataset(settings)
             # write arrays to temp npy files to avoid heavy XCom
-            tmp_dir = tempfile.mkdtemp(prefix="iris_data_")
+            tmp_dir = tempfile.mkdtemp(prefix="breast_cancer_data_")
             X_path = os.path.join(tmp_dir, "X.npy")
             y_path = os.path.join(tmp_dir, "y.npy")
             np.save(X_path, X)
@@ -81,7 +81,7 @@ def iris_mlflow_training_dag():
             eval_metrics, cm = metrics_mod.compute_metrics(y_test, y_pred)
 
             # Persist confusion matrix to file for artifact logging
-            tmp_dir = tempfile.mkdtemp(prefix="iris_eval_")
+            tmp_dir = tempfile.mkdtemp(prefix="breast_cancer_eval_")
             cm_path = os.path.join(tmp_dir, "confusion_matrix.csv")
             pd.DataFrame(cm).to_csv(cm_path, index=False)
             return {
@@ -148,4 +148,4 @@ def iris_mlflow_training_dag():
     _ = evaluation_group(tr)
 
 
-dag = iris_mlflow_training_dag()
+dag = breast_cancer_mlflow_training_dag()

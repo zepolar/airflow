@@ -16,16 +16,42 @@ from .db import get_engine
 
 
 FEATURE_COLS: List[str] = [
-    "sepal_length",
-    "sepal_width",
-    "petal_length",
-    "petal_width",
+    "mean_radius",
+    "mean_texture",
+    "mean_perimeter",
+    "mean_area",
+    "mean_smoothness",
+    "mean_compactness",
+    "mean_concavity",
+    "mean_concave_points",
+    "mean_symmetry",
+    "mean_fractal_dimension",
+    "radius_error",
+    "texture_error",
+    "perimeter_error",
+    "area_error",
+    "smoothness_error",
+    "compactness_error",
+    "concavity_error",
+    "concave_points_error",
+    "symmetry_error",
+    "fractal_dimension_error",
+    "worst_radius",
+    "worst_texture",
+    "worst_perimeter",
+    "worst_area",
+    "worst_smoothness",
+    "worst_compactness",
+    "worst_concavity",
+    "worst_concave_points",
+    "worst_symmetry",
+    "worst_fractal_dimension",
 ]
 
 
 def load_dataset(settings: Settings) -> Tuple[np.ndarray, np.ndarray]:
     engine = get_engine(settings)
-    df = pd.read_sql(f"SELECT * FROM {settings.iris_table}", con=engine)
+    df = pd.read_sql(f"SELECT * FROM {settings.breast_cancer_table}", con=engine)
     X = df[FEATURE_COLS].values
     y = df["target"].values
     return X, y
@@ -47,7 +73,7 @@ def fit_model(settings: Settings, X: np.ndarray, y: np.ndarray):
     y_pred = model.predict(X_test)
 
     # Persist model to a temp path to avoid XCom heavy objects
-    tmp_dir = tempfile.mkdtemp(prefix="iris_model_")
+    tmp_dir = tempfile.mkdtemp(prefix="breast_cancer_model_")
     model_path = os.path.join(tmp_dir, "model.joblib")
     joblib.dump(model, model_path)
 

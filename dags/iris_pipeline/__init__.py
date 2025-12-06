@@ -1,4 +1,4 @@
-"""Iris pipeline modular components applying SOLID principles.
+"""Breast Cancer pipeline modular components applying SOLID principles.
 
 Modules:
 - config: runtime configuration via environment variables
