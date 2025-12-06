@@ -35,7 +35,7 @@ services:
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
     environment:
-      MLFLOW_TRACKING_URI: http://0.0.0.0:5000
+      MLFLOW_TRACKING_URI: http://mlflow:5000
       # Allow requests coming from Docker network hostnames to the tracking server
       # This fixes: "Rejected request with invalid Host header: mlflow:5000"
       # List comma-separated hostnames that will appear in the HTTP Host header

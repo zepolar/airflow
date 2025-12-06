@@ -8,6 +8,31 @@ from .config import Settings
 from .types import MlflowResult
 
 
+# Ensure that, even if no logging handler is configured inside the Airflow
+# container, our messages are still visible in task logs. Airflow usually
+# configures logging, but in some setups custom images might miss that.
+def _emit_log(level: str, msg: str, *args: Any) -> None:
+    try:
+        root = logging.getLogger()
+        logger = logging.getLogger(__name__)
+        # If there are no handlers configured at all, set up a basic one
+        if not root.handlers and not logger.handlers:
+            logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+        # Forward to logging module
+        log_fn = getattr(logging.getLogger(__name__), level, None)
+        if callable(log_fn):
+            log_fn(msg, *args)
+    except Exception:
+        # Never fail because of logging
+        pass
+    # Always also print, so stdout captures it in Docker logs even if logging is misconfigured
+    try:
+        print(msg % args if args else msg, flush=True)
+    except Exception:
+        # Fallback plain print
+        print(msg, flush=True)
+
+
 class MetricsLogger:
     def log_all(
         self,
@@ -53,12 +78,13 @@ class MLflowMetricsLogger(MetricsLogger):
             if self.tracking_uri:
                 mlflow.set_tracking_uri(self.tracking_uri)
             # Emit a small debug line to Airflow logs to make troubleshooting easier
-            logging.getLogger(__name__).info(
+            _emit_log(
+                "info",
                 "MLflow logging: tracking_uri=%s, experiment=%s",
                 mlflow.get_tracking_uri(),
                 self.experiment_name,
             )
-            logging.getLogger(__name__).info("Ensuring MLflow experiment exists: %s", self.experiment_name)
+            _emit_log("info", "Ensuring MLflow experiment exists: %s", self.experiment_name)
 
             # Robustly ensure the experiment exists and obtain its ID
             client = MlflowClient()
@@ -66,16 +92,15 @@ class MLflowMetricsLogger(MetricsLogger):
             if exp is None:
                 try:
                     exp_id = client.create_experiment(self.experiment_name)
-                    logging.getLogger(__name__).info(
+                    _emit_log(
+                        "info",
                         "Created MLflow experiment '%s' with id=%s",
                         self.experiment_name,
                         exp_id,
                     )
                 except Exception as ce:
                     # There can be a race if multiple tasks try to create simultaneously; re-fetch
-                    logging.getLogger(__name__).warning(
-                        "Creating MLflow experiment failed (%s). Will retry fetching it.", ce
-                    )
+                    _emit_log("warning", "Creating MLflow experiment failed (%s). Will retry fetching it.", ce)
                     exp = client.get_experiment_by_name(self.experiment_name)
                     if exp is None:
                         raise
@@ -83,9 +108,7 @@ class MLflowMetricsLogger(MetricsLogger):
             else:
                 exp_id = exp.experiment_id
 
-            logging.getLogger(__name__).info(
-                "Using MLflow experiment '%s' (id=%s)", self.experiment_name, exp_id
-            )
+            _emit_log("info", "Using MLflow experiment '%s' (id=%s)", self.experiment_name, exp_id)
 
             # Start the run explicitly under the resolved experiment id
             with mlflow.start_run(experiment_id=exp_id) as run:
@@ -114,7 +137,7 @@ class MLflowMetricsLogger(MetricsLogger):
 
                 return MlflowResult(run_id=run_id, error=None)
         except Exception as e:
-            logging.getLogger(__name__).warning("MLflow logging failed: %s", e)
+            _emit_log("warning", "MLflow logging failed: %s", e)
             return MlflowResult(run_id=None, error=str(e))
 
 

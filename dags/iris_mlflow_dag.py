@@ -98,10 +98,11 @@ def iris_mlflow_training_dag():
         def log_mlflow(train_result: Dict[str, Any], eval_result: Dict[str, Any]) -> Dict[str, Any]:
             # Emit a preflight log so users know where to look (Airflow task logs, not MLflow container)
             effective_tracking_uri = settings.mlflow_tracking_uri or os.getenv("MLFLOW_TRACKING_URI")
-            logging.getLogger(__name__).info(
-                "About to log to MLflow from Airflow task: tracking_uri=%s, experiment=%s",
-                effective_tracking_uri,
-                settings.experiment_name,
+            # Use print to guarantee visibility even if logging handlers are missing in the container
+            print(
+                f"[MLFLOW] BEGIN logging from Airflow task: tracking_uri={effective_tracking_uri}, "
+                f"experiment={settings.experiment_name}",
+                flush=True,
             )
             logger = build_metrics_logger(settings)
             ml = logger.log_all(
@@ -111,6 +112,8 @@ def iris_mlflow_training_dag():
                 features=train_result["features"],
                 confusion_matrix_path=eval_result.get("confusion_matrix_path"),
             )
+            # Post-flight visibility to confirm MLflow outcome in Airflow task logs
+            print(f"[MLFLOW] END logging: run_id={ml.run_id}, error={ml.error}", flush=True)
             return {"run_id": ml.run_id, "mlflow_error": ml.error}
 
         @task()
@@ -119,6 +122,12 @@ def iris_mlflow_training_dag():
             db_mod.ensure_tables(engine, settings)
             ctx = get_current_context()
             ds = ctx.get("ds")
+            # Echo the incoming MLflow result to ensure at least one task surfaces it in logs
+            print(
+                f"[MLFLOW] Persisting evaluation with run_id={mlflow_result.get('run_id')} "
+                f"error={mlflow_result.get('mlflow_error')}",
+                flush=True,
+            )
             payload = {
                 "run_id": mlflow_result.get("run_id"),
                 "accuracy": eval_result["metrics"]["accuracy"],
